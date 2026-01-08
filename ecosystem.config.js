@@ -7,8 +7,7 @@ module.exports = {
   apps: [
     {
       name: 'shootingstar-web',
-      script: 'node_modules/.bin/next',
-      args: 'start',
+      script: 'server.js',
       cwd: '/app',
       instances: 1,
       autorestart: true,
@@ -17,6 +16,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3000,
+        HOSTNAME: '0.0.0.0',
       },
     },
     {
