@@ -6,6 +6,8 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { LABEL_REGISTRY, LabelCategory, getLabelsByCategory } from '../labels/types';
 
 const execAsync = promisify(exec);
@@ -66,45 +68,56 @@ export class ClaudeCliService {
   }
 
   /**
-   * Check if Claude CLI is authenticated
-   * Returns true if authenticated, false if login required
+   * Check if Claude CLI is authenticated by checking credentials file
+   * This is a fast check that doesn't require running a prompt
    */
   static async isAuthenticated(): Promise<boolean> {
     try {
-      // Try a minimal prompt to check auth status
-      const { stdout, stderr } = await execAsync(
-        'claude -p "respond with just the word OK" --output-format text 2>&1',
-        { timeout: 15000 }
-      );
+      // Check for credentials file in HOME directory
+      const homeDir = process.env.HOME || '/home/nextjs';
+      const credentialsPath = join(homeDir, '.claude', '.credentials.json');
 
-      // Check for auth-related error messages
-      const combined = stdout + stderr;
-      if (
-        combined.includes('not authenticated') ||
-        combined.includes('login required') ||
-        combined.includes('Please run') ||
-        combined.includes('/login') ||
-        combined.includes('sign in')
-      ) {
+      if (!existsSync(credentialsPath)) {
         return false;
       }
 
-      // If we got a response containing "OK", we're authenticated
-      if (combined.toLowerCase().includes('ok')) {
-        return true;
+      // Read and validate credentials file has required OAuth tokens
+      const credentialsContent = readFileSync(credentialsPath, 'utf-8');
+      const credentials = JSON.parse(credentialsContent);
+
+      // Check for valid OAuth tokens (claudeAiOauth with accessToken)
+      if (
+        credentials.claudeAiOauth &&
+        credentials.claudeAiOauth.accessToken &&
+        credentials.claudeAiOauth.expiresAt
+      ) {
+        // Check if token is not expired (with 5 min buffer)
+        const expiresAt = credentials.claudeAiOauth.expiresAt;
+        const now = Date.now();
+        if (expiresAt > now + 5 * 60 * 1000) {
+          return true;
+        }
+        // Token expired but refresh token might work - consider authenticated
+        // The actual call will handle refresh
+        if (credentials.claudeAiOauth.refreshToken) {
+          return true;
+        }
       }
 
-      // Default to authenticated if no error indicators
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if Claude CLI binary is available
+   */
+  static async isCliInstalled(): Promise<boolean> {
+    try {
+      await execAsync('which claude', { timeout: 5000 });
       return true;
-    } catch (error: unknown) {
-      const err = error as Error & { code?: string };
-      // CLI not installed or other error
-      if (err.message?.includes('command not found') || err.code === 'ENOENT') {
-        throw new Error(
-          'Claude CLI not installed. Install with: npm install -g @anthropic-ai/claude-code'
-        );
-      }
-      // Timeout or other errors suggest auth issues
+    } catch {
       return false;
     }
   }
