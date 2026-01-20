@@ -32,19 +32,17 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Install PM2 globally
-RUN npm install -g pm2
-
-# Install Claude CLI (may need adjustment based on actual distribution)
-# For now, assume it will be available via volume mount or manual installation
-# RUN npm install -g @anthropic-ai/claude-code || true
+# Install PM2 and Claude CLI globally
+RUN npm install -g pm2 @anthropic-ai/claude-code
 
 # Install runtime dependencies for native modules
 RUN apk add --no-cache python3
 
-# Create non-root user
+# Create non-root user with home directory
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+    adduser --system --uid 1001 --home /home/nextjs nextjs && \
+    mkdir -p /home/nextjs/.claude && \
+    chown -R nextjs:nodejs /home/nextjs
 
 # Copy built artifacts
 COPY --from=builder /app/.next/standalone ./
@@ -64,6 +62,7 @@ RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATABASE_PATH=/app/data/shootingstar.db
+ENV HOME=/home/nextjs
 
 # Expose port
 EXPOSE 3000
