@@ -31,7 +31,7 @@ function isEmailProcessed(gmailId: string): boolean {
 }
 
 function isPendingReview(gmailId: string): boolean {
-  const row = db.prepare('SELECT id FROM pending_reviews WHERE gmail_id = ? AND status = "pending"').get(gmailId);
+  const row = db.prepare("SELECT id FROM pending_reviews WHERE gmail_id = ? AND status = 'pending'").get(gmailId);
   return !!row;
 }
 

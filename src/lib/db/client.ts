@@ -186,7 +186,7 @@ export function updatePendingReviewStatus(id: number, status: 'completed' | 'ski
 
 export function isPendingReview(gmailId: string): boolean {
   const row = getDb()
-    .prepare('SELECT id FROM pending_reviews WHERE gmail_id = ? AND status = "pending"')
+    .prepare("SELECT id FROM pending_reviews WHERE gmail_id = ? AND status = 'pending'")
     .get(gmailId);
   return !!row;
 }
