@@ -1,6 +1,6 @@
 /**
  * ShootingStar Background Worker
- * Polls Gmail every 2 minutes for starred emails and processes them
+ * Polls Gmail every 30 seconds for starred emails and processes them
  */
 
 import cron from 'node-cron';
@@ -277,8 +277,8 @@ ClaudeCliService.isAuthenticated()
     log('error', 'Failed to check Claude CLI auth:', err.message);
   });
 
-// Schedule every 2 minutes
-cron.schedule('*/2 * * * *', async () => {
+// Schedule every 30 seconds (6-field cron with seconds)
+cron.schedule('*/30 * * * * *', async () => {
   log('info', 'Cron triggered');
   await processStarredEmails();
 });
@@ -297,7 +297,7 @@ setTimeout(async () => {
   await processStarredEmails();
 }, 5000);
 
-log('info', 'ShootingStar Worker started, polling every 2 minutes');
+log('info', 'ShootingStar Worker started, polling every 30 seconds');
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
