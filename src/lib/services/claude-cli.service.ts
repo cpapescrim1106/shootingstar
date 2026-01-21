@@ -215,21 +215,37 @@ Return valid JSON only.`;
       });
 
       // Try to parse the JSON response
+      // Claude CLI with --output-format json returns: {"type":"result","result":"...","..."}
+      // The actual response is in the "result" field, possibly wrapped in markdown code blocks
       let parsed: TaskExtraction;
       try {
-        // Find JSON in the response (claude might add extra text)
-        const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+        // First parse the CLI wrapper JSON
+        const cliResponse = JSON.parse(stdout);
+
+        if (cliResponse.is_error || cliResponse.subtype === 'error') {
+          throw new Error(cliResponse.result || 'Claude CLI returned an error');
+        }
+
+        // Extract the result field which contains Claude's actual response
+        const resultText = cliResponse.result || '';
+
+        // Find JSON in the result - it might be wrapped in markdown code blocks
+        // Try to match ```json ... ``` first, then fall back to any JSON object
+        const codeBlockMatch = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        const jsonText = codeBlockMatch ? codeBlockMatch[1].trim() : resultText;
+
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           parsed = JSON.parse(jsonMatch[0]);
         } else {
-          throw new Error('No JSON found in response');
+          throw new Error('No JSON found in Claude response');
         }
       } catch (parseError) {
-        console.error('Failed to parse Claude response:', stdout);
+        console.error('Failed to parse Claude response:', stdout.substring(0, 500));
         return {
           success: false,
           fallbackRequired: true,
-          error: `Failed to parse Claude response: ${stdout.substring(0, 200)}`,
+          error: `Failed to parse Claude response: ${(parseError as Error).message}`,
         };
       }
 
