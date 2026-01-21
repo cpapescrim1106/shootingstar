@@ -26,7 +26,7 @@ interface ErrorLogProps {
 export function ErrorLog({ errors }: ErrorLogProps) {
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);
-    return date.toLocaleString();
+    return date.toLocaleString('en-US', { timeZone: 'America/New_York' });
   };
 
   return (

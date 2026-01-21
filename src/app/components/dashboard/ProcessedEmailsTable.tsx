@@ -30,7 +30,7 @@ interface ProcessedEmailsTableProps {
 export function ProcessedEmailsTable({ emails }: ProcessedEmailsTableProps) {
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);
-    return date.toLocaleString();
+    return date.toLocaleString('en-US', { timeZone: 'America/New_York' });
   };
 
   const getLabelDisplay = (labelId: string) => {

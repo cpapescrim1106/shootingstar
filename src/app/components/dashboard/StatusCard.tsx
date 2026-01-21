@@ -25,7 +25,7 @@ export function StatusCard({
   const formatTime = (isoString: string | null) => {
     if (!isoString) return 'Never';
     const date = new Date(isoString);
-    return date.toLocaleString();
+    return date.toLocaleString('en-US', { timeZone: 'America/New_York' });
   };
 
   const getServiceBadge = (
