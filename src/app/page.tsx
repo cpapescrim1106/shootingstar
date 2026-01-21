@@ -144,7 +144,6 @@ export default function Dashboard() {
             <>
               <StatusCard {...status} />
               <ControlButtons
-                running={status.running}
                 gmailAuthenticated={status.services.gmail === 'authenticated'}
                 onRefresh={fetchData}
               />

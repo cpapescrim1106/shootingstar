@@ -112,13 +112,6 @@ async function processStarredEmails(): Promise<void> {
   setAutomationState('last_run', new Date().toISOString());
 
   try {
-    // Check if automation is running
-    const running = getAutomationState('running');
-    if (running !== 'true') {
-      log('info', 'Automation is stopped, skipping cycle');
-      return;
-    }
-
     // Initialize services
     const gmail = new GmailService();
     const todoist = new TodoistService();

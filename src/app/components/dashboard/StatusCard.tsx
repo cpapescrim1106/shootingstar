@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 interface StatusCardProps {
-  running: boolean;
   lastRun: string | null;
   processedCount24h: number;
   errorCount24h: number;
@@ -17,7 +16,6 @@ interface StatusCardProps {
 }
 
 export function StatusCard({
-  running,
   lastRun,
   processedCount24h,
   errorCount24h,
@@ -48,9 +46,7 @@ export function StatusCard({
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Automation Status</span>
-          <Badge className={running ? 'bg-green-600' : 'bg-red-600'}>
-            {running ? 'Running' : 'Stopped'}
-          </Badge>
+          <Badge className="bg-green-600">Active</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
