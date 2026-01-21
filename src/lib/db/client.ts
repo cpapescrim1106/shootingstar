@@ -42,7 +42,7 @@ export function getAutomationState(key: string): string | null {
 export function setAutomationState(key: string, value: string): void {
   getDb()
     .prepare(
-      'INSERT OR REPLACE INTO automation_state (key, value, updated_at) VALUES (?, ?, datetime("now"))'
+      `INSERT OR REPLACE INTO automation_state (key, value, updated_at) VALUES (?, ?, datetime('now'))`
     )
     .run(key, value);
 }
