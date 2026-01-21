@@ -165,30 +165,39 @@ export class GmailService {
 
   /**
    * Extract text body from email message
+   * Prefers text/plain but falls back to text/html if needed
    */
   private extractEmailBody(message: any): string {
-    let body = '';
+    let plainText = '';
+    let htmlText = '';
 
-    const extractFromParts = (parts: any[]): string => {
+    const extractFromParts = (parts: any[]): void => {
       for (const part of parts) {
-        if (part.mimeType === 'text/plain' && part.body?.data) {
-          return Buffer.from(part.body.data, 'base64').toString('utf-8');
+        if (part.mimeType === 'text/plain' && part.body?.data && !plainText) {
+          plainText = Buffer.from(part.body.data, 'base64').toString('utf-8');
+        }
+        if (part.mimeType === 'text/html' && part.body?.data && !htmlText) {
+          htmlText = Buffer.from(part.body.data, 'base64').toString('utf-8');
         }
         if (part.parts) {
-          const nested = extractFromParts(part.parts);
-          if (nested) return nested;
+          extractFromParts(part.parts);
         }
       }
-      return '';
     };
 
     if (message.payload?.parts) {
-      body = extractFromParts(message.payload.parts);
+      extractFromParts(message.payload.parts);
     } else if (message.payload?.body?.data) {
-      body = Buffer.from(message.payload.body.data, 'base64').toString('utf-8');
+      const content = Buffer.from(message.payload.body.data, 'base64').toString('utf-8');
+      if (message.payload?.mimeType === 'text/html') {
+        htmlText = content;
+      } else {
+        plainText = content;
+      }
     }
 
-    return body;
+    // Prefer plain text, fall back to HTML (Claude can parse HTML)
+    return plainText || htmlText;
   }
 
   /**
