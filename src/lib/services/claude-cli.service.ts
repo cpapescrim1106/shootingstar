@@ -51,6 +51,13 @@ export interface ClaudeCliResult {
   fallbackRequired?: boolean;
 }
 
+type ExecError = Error & {
+  killed?: boolean;
+  code?: string | number;
+  stdout?: string;
+  stderr?: string;
+};
+
 export class ClaudeCliService {
   private static CLI_TIMEOUT = 60000; // 60 seconds
 
@@ -206,10 +213,14 @@ Return valid JSON only.`;
     const schemaBase64 = Buffer.from(schemaJson).toString('base64');
 
     try {
-      // Use a heredoc approach to avoid shell escaping issues
-      const command = `echo "${promptBase64}" | base64 -d | claude -p - --output-format json`;
+      // Decode the prompt and schema inside the shell so arbitrary email text
+      // never needs to be shell-escaped.
+      const command =
+        `schema=$(echo "${schemaBase64}" | base64 -d); ` +
+        `echo "${promptBase64}" | base64 -d | ` +
+        `claude -p - --output-format json --no-session-persistence --json-schema "$schema"`;
 
-      const { stdout, stderr } = await execAsync(command, {
+      const { stdout } = await execAsync(command, {
         timeout: this.CLI_TIMEOUT,
         maxBuffer: 1024 * 1024, // 1MB
       });
@@ -226,19 +237,23 @@ Return valid JSON only.`;
           throw new Error(cliResponse.result || 'Claude CLI returned an error');
         }
 
-        // Extract the result field which contains Claude's actual response
-        const resultText = cliResponse.result || '';
-
-        // Find JSON in the result - it might be wrapped in markdown code blocks
-        // Try to match ```json ... ``` first, then fall back to any JSON object
-        const codeBlockMatch = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        const jsonText = codeBlockMatch ? codeBlockMatch[1].trim() : resultText;
-
-        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[0]);
+        if (cliResponse.structured_output) {
+          parsed = cliResponse.structured_output;
         } else {
-          throw new Error('No JSON found in Claude response');
+          // Extract the result field which contains Claude's actual response
+          const resultText = cliResponse.result || '';
+
+          // Find JSON in the result - it might be wrapped in markdown code blocks
+          // Try to match ```json ... ``` first, then fall back to any JSON object
+          const codeBlockMatch = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
+          const jsonText = codeBlockMatch ? codeBlockMatch[1].trim() : resultText;
+
+          const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            parsed = JSON.parse(jsonMatch[0]);
+          } else {
+            throw new Error('No JSON found in Claude response');
+          }
         }
       } catch (parseError) {
         console.error('Failed to parse Claude response:', stdout.substring(0, 500));
@@ -250,11 +265,13 @@ Return valid JSON only.`;
       }
 
       // Validate the response has required fields
-      if (!parsed.task || !Array.isArray(parsed.labels)) {
+      if (!parsed || typeof parsed !== 'object' || !parsed.task || !Array.isArray(parsed.labels)) {
+        const returnedFields =
+          parsed && typeof parsed === 'object' ? Object.keys(parsed).join(', ') : typeof parsed;
         return {
           success: false,
           fallbackRequired: true,
-          error: 'Claude response missing required fields (task, labels)',
+          error: `Claude response missing required fields (task, labels). Fields returned: ${returnedFields}`,
         };
       }
 
@@ -276,7 +293,7 @@ Return valid JSON only.`;
         },
       };
     } catch (error: unknown) {
-      const err = error as Error & { killed?: boolean; code?: string };
+      const err = error as ExecError;
 
       if (err.killed) {
         return {
@@ -286,10 +303,16 @@ Return valid JSON only.`;
         };
       }
 
+      const cliDetails = [err.stderr, err.stdout]
+        .filter(Boolean)
+        .join('\n')
+        .trim()
+        .slice(0, 500);
+
       return {
         success: false,
         fallbackRequired: true,
-        error: err.message || 'Unknown error calling Claude CLI',
+        error: cliDetails || err.message || 'Unknown error calling Claude CLI',
       };
     }
   }
