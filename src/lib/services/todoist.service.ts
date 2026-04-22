@@ -1,11 +1,16 @@
 /**
  * Todoist Service
- * Handles task creation and label management via Todoist REST API v2
+ * Handles task creation and label management via Todoist API v1
  */
 
-import { LABEL_REGISTRY, formatLabel } from '../labels/types';
+import { LABEL_REGISTRY } from '../labels/types';
 
-const TODOIST_API_URL = 'https://api.todoist.com/rest/v2';
+const TODOIST_API_URL = 'https://api.todoist.com/api/v1';
+
+interface PaginatedResponse<T> {
+  results: T[];
+  next_cursor: string | null;
+}
 
 export interface TodoistTask {
   id: string;
@@ -64,9 +69,27 @@ export class TodoistService {
     return response.json() as Promise<T>;
   }
 
+  private async requestAllPages<T>(endpoint: string): Promise<T[]> {
+    const results: T[] = [];
+    let cursor: string | null = null;
+
+    do {
+      const params = new URLSearchParams({ limit: '200' });
+      if (cursor) {
+        params.set('cursor', cursor);
+      }
+
+      const page = await this.request<PaginatedResponse<T>>(`${endpoint}?${params}`);
+      results.push(...page.results);
+      cursor = page.next_cursor;
+    } while (cursor);
+
+    return results;
+  }
+
   /**
    * Convert label IDs to label names for Todoist API
-   * Todoist REST API v2 uses label names, not IDs
+   * Todoist API v1 uses label names, not IDs
    */
   private async getLabelNames(labelIds: string[]): Promise<string[]> {
     const names: string[] = [];
@@ -123,7 +146,6 @@ export class TodoistService {
       content: string;
       description: string;
       labels: string[];
-      url: string;
     }>('/tasks', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -134,7 +156,7 @@ export class TodoistService {
       content: task.content,
       description: task.description || '',
       labels: task.labels || [],
-      url: task.url,
+      url: `https://todoist.com/showTask?id=${task.id}`,
     };
   }
 
@@ -142,7 +164,7 @@ export class TodoistService {
    * Get all labels from Todoist account
    */
   async getLabels(): Promise<Array<{ id: string; name: string }>> {
-    return this.request<Array<{ id: string; name: string }>>('/labels');
+    return this.requestAllPages<{ id: string; name: string }>('/labels');
   }
 
   /**
@@ -154,7 +176,7 @@ export class TodoistService {
     const existingNames = new Set(existingLabels.map((l) => l.name));
 
     // Check each label in our registry
-    for (const [id, info] of Object.entries(LABEL_REGISTRY)) {
+    for (const info of Object.values(LABEL_REGISTRY)) {
       const fullName = `${info.name} ${info.emoji}`;
 
       if (!existingNames.has(fullName)) {

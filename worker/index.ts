@@ -252,8 +252,10 @@ log('info', 'ShootingStar Worker starting...');
 try {
   ClaudeCliService.validateEnvironment();
   log('info', 'Environment validation passed');
+  setAutomationState('running', 'true');
 } catch (error) {
   log('error', 'Environment validation failed:', (error as Error).message);
+  setAutomationState('running', 'false');
   process.exit(1);
 }
 
@@ -295,12 +297,14 @@ log('info', 'ShootingStar Worker started, polling every 30 seconds');
 // Handle graceful shutdown
 process.on('SIGINT', () => {
   log('info', 'Received SIGINT, shutting down...');
+  setAutomationState('running', 'false');
   db.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   log('info', 'Received SIGTERM, shutting down...');
+  setAutomationState('running', 'false');
   db.close();
   process.exit(0);
 });
